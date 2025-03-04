@@ -1,6 +1,7 @@
 use clap::Parser;
 use clap_derive::Parser;
 use genai::chat::{ChatMessage, ChatRequest};
+use genai::resolver::AuthData;
 use genai::Client;
 use std::borrow::Cow;
 use std::fs::{read_to_string, write};
@@ -26,12 +27,12 @@ pub struct Cli {
 
     /// The path of the output file that will be created as a result of updating
     /// the resume.
-    ///
-    /// If the file doesn't exist then it will be created. If the file exists
-    /// then an error will be thrown instead of the file being overridden with
-    /// no warning.
     #[clap(short, long)]
     output: PathBuf,
+
+    /// The Gemini API key.
+    #[clap(short, long)]
+    api_key: String,
 
     /// The url of the job description.
     ///
@@ -40,9 +41,14 @@ pub struct Cli {
     #[clap(short, long)]
     job_description_url: String,
 
-    /// The path to a file to use as the template for updating the resume.
+    /// The path to a file to use as the template for the prompt to the AI to
+    /// update the template.
     #[clap(short, long)]
     template: Option<PathBuf>,
+
+    /// The model to use in updating the resume.
+    #[clap(short, long, default_value = "gemini-2.0-pro-exp-02-05")]
+    model: String,
 }
 
 impl Cli {
@@ -64,11 +70,14 @@ impl Cli {
     }
 
     pub fn gemini_client(&self) -> Client {
-        Client::builder().build()
+        let key = self.api_key.clone();
+        Client::builder()
+            .with_auth_resolver_fn(move |_| Ok(Some(AuthData::from_single(key))))
+            .build()
     }
 
     pub fn model(&self) -> String {
-        "gemini-2.0-pro-exp-02-05".to_owned()
+        self.model.clone()
     }
 }
 
@@ -114,10 +123,6 @@ async fn main() -> Result<(), Error> {
         .and_then(|end| response.get(9..end))
         .unwrap_or("");
 
-    let Ok(false) = std::fs::exists(&cli.output) else {
-        return Err(Error::FileAlreadyExists(cli.output));
-    };
-
     write(cli.output, cleaned_up_response).map_err(Error::FailedToWriteOutput)?;
 
     Ok(())
@@ -130,5 +135,4 @@ pub enum Error {
     FailedToWriteOutput(std::io::Error),
     FailedToFetchJobDescriptionPage(reqwest::Error),
     GeminiError(genai::Error),
-    FileAlreadyExists(PathBuf),
 }
