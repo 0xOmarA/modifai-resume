@@ -1,0 +1,11 @@
+[package]
+name = "modifai-resume"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = "4.5.31"
+clap_derive = "4.5.28"
+genai = "0.1.23"
+reqwest = "0.12.12"
+tokio = { version = "1.43.0", features = ["full"] }
